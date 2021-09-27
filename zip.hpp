@@ -122,6 +122,91 @@ using uint64_t = zip_uint64_t;
 using source = std::function<struct zip_source* (struct zip*)>;
 
 /**
+* \brief Buffer for memory zip file.
+*/
+class memory_buffer {
+private:
+  std::unique_ptr<struct zip_source, void(*)(struct zip_source*)> handle_;
+
+  memory_buffer(const memory_buffer&) = delete;
+  memory_buffer& operator=(const memory_buffer&) = delete;
+public:
+
+  /**
+  * Create a Memorybuffer.
+  *  
+  */
+  inline memory_buffer()
+    : handle_(nullptr, nullptr)
+  {
+    zip_error_t error;
+    auto* zsmem = zip_source_buffer_create(0, 0, 0, &error);
+    if (zsmem == nullptr) {
+      throw std::runtime_error(zip_error_strerror(&error));
+    }
+    zip_source_keep(zsmem);
+    handle_ = { zsmem, &zip_source_free };
+  }
+
+  /**
+  * Create a Memorybuffer with a buffer.
+  *
+  * \param the buffer to use
+  */
+  inline explicit memory_buffer(std::vector<uint8_t>& buffer)
+    : handle_(nullptr, nullptr)
+  {
+    zip_error_t error;
+    auto* zsmem = zip_source_buffer_create(buffer.data(), buffer.size(), 0, &error);
+    if (zsmem == nullptr) {
+      throw std::runtime_error(zip_error_strerror(&error));
+    }
+    zip_source_keep(zsmem);
+    handle_ = { zsmem, &zip_source_free };
+  }
+
+  /**
+  * Get underlying zip structure.
+  */
+  struct zip_source* source() const noexcept
+  {
+    return handle_.get();
+  }
+
+  /**
+  * Get the size of the memory buffer.
+  */
+  inline zip_int64_t size() noexcept
+  {
+    zip_source_open(handle_.get());
+    zip_int64_t old = zip_source_tell(handle_.get());
+    zip_source_seek(handle_.get(), 0, SEEK_END);
+    zip_int64_t sz = zip_source_tell(handle_.get());
+    zip_source_seek(handle_.get(), old, SEEK_SET);
+    zip_source_close(handle_.get());
+    return sz;
+  }
+
+  inline std::string read()
+  {
+    std::string result;
+    zip_source_open(handle_.get());
+    zip_int64_t old = zip_source_tell(handle_.get());
+    zip_source_seek(handle_.get(), 0, SEEK_END);
+    zip_int64_t sz = zip_source_tell(handle_.get());
+    zip_source_seek(handle_.get(), 0, SEEK_SET);
+    if(sz > 0)
+    {
+      result.resize(sz);
+      zip_source_read(handle_.get(), &result[0], sz);
+      zip_source_seek(handle_.get(), old, SEEK_SET);
+      zip_source_close(handle_.get());
+    }
+    return result;
+  }
+};
+
+/**
  * \brief File for reading.
  */
 class file {
@@ -163,7 +248,7 @@ public:
      * \param length the length
      * \return the number of bytes written or -1 on failure
      */
-    inline int read(void* data, uint64_t length) noexcept
+    inline zip_int64_t read(void* data, uint64_t length) noexcept
     {
         return zip_fread(handle_.get(), data, length);
     }
@@ -536,6 +621,18 @@ public:
         handle_ = { archive, zip_close };
     }
 
+    archive(const memory_buffer& buffer, flags_t flags = 0)
+      : handle_(nullptr, nullptr)
+    {
+      zip_error_t error;
+      struct zip* archive = zip_open_from_source(buffer.source(), flags, &error);
+      if (archive == nullptr) {
+        throw std::runtime_error(zip_error_strerror(&error));
+      }
+
+      handle_ = { archive, zip_close };
+    }
+
     /**
      * Move constructor defaulted.
      *
@@ -624,7 +721,7 @@ public:
         auto size = text.size();
         auto cstr = (size == 0) ? nullptr : text.c_str();
 
-        if (zip_file_set_comment(handle_.get(), index, cstr, size, flags) < 0)
+        if (zip_file_set_comment(handle_.get(), index, cstr, static_cast<zip_uint16_t>(size), flags) < 0)
             throw std::runtime_error(zip_strerror(handle_.get()));
     }
 
@@ -655,7 +752,7 @@ public:
      */
     void set_comment(const std::string& comment)
     {
-        if (zip_set_archive_comment(handle_.get(), comment.c_str(), comment.size()) < 0)
+        if (zip_set_archive_comment(handle_.get(), comment.c_str(), static_cast<zip_uint16_t>(comment.size())) < 0)
             throw std::runtime_error(zip_strerror(handle_.get()));
     }
 
