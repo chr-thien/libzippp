@@ -55,7 +55,7 @@ typedef struct zip_stat stat;
 /**
  * \brief zip_source_cmd typedef.
  */
-using source_cmd = enum zip_source_cmd;
+using source_cmd = zip_source_cmd;
 
 /**
  * \brief zip_source_cmd typedef.
@@ -410,7 +410,7 @@ public:
     /**
      * \brief Base iterator class
      */
-    class iterator : public std::iterator<std::random_access_iterator_tag, libzip::stat> {
+    class iterator {
     private:
         friend class archive;
 
@@ -424,6 +424,13 @@ public:
         }
 
     public:
+
+        using iterator_category = std::random_access_iterator_tag;
+        using value_type = libzip::stat;
+        using difference_type = std::ptrdiff_t;
+        using pointer = libzip::stat*;
+        using reference = libzip::stat&;
+
         /**
          * Default iterator.
          */
