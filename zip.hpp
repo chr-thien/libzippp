@@ -141,7 +141,7 @@ public:
   inline memory_buffer()
     : handle_(nullptr, nullptr)
   {
-    zip_error_t error;
+    zip_error_t error{};
     auto* zsmem = zip_source_buffer_create(0, 0, 0, &error);
     if (zsmem == nullptr) {
       throw std::runtime_error(zip_error_strerror(&error));
@@ -158,7 +158,7 @@ public:
   inline explicit memory_buffer(std::vector<uint8_t>& buffer)
     : handle_(nullptr, nullptr)
   {
-    zip_error_t error;
+    zip_error_t error{};
     auto* zsmem = zip_source_buffer_create(buffer.data(), buffer.size(), 0, &error);
     if (zsmem == nullptr) {
       throw std::runtime_error(zip_error_strerror(&error));
@@ -633,7 +633,7 @@ public:
     archive(const memory_buffer& buffer, flags_t flags = 0)
       : handle_(nullptr, nullptr)
     {
-      zip_error_t error;
+      zip_error_t error{};
       struct zip* archive = zip_open_from_source(buffer.source(), flags, &error);
       if (archive == nullptr) {
         throw std::runtime_error(zip_error_strerror(&error));
