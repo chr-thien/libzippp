@@ -620,11 +620,10 @@ public:
         struct zip* archive = zip_open(path.c_str(), flags, &error);
 
         if (archive == nullptr) {
-            char buf[128]{0};
+            zip_error_t err;
+            zip_error_init_with_code(&err, error);
 
-            zip_error_to_str(buf, sizeof (buf), error, errno);
-
-            throw std::runtime_error(buf);
+            throw std::runtime_error(zip_error_strerror(&err));
         }
 
         handle_ = { archive, zip_close };
